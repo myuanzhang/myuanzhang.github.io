@@ -1,0 +1,9 @@
+baseURL = 'https://myuanzhang.github.io/'
+languageCode = 'en-us'
+title = 'Hello~'
+
+theme = "PaperMod"
+
+[params]
+  ShowReadingTime = true
+  ShowToc = true
