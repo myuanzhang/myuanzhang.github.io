@@ -1,0 +1,42 @@
+{{/*
+Shortcode: img
+
+Usage:
+{{< img src="cinema_server.webp" width="50%" >}}
+{{< img src="cinema_server.webp" width="50%" align="center" >}}
+{{< img src="cinema_server.webp" width="50%" caption="MCP 架构示意图" >}}
+
+Features:
+- 默认左对齐
+- 支持 Page Bundle
+- 可选 center 对齐
+- 可选 caption
+*/}}
+
+{{- $src := .Get "src" -}}
+{{- $width := .Get "width" | default "100%" -}}
+{{- $align := .Get "align" | default "left" -}}
+{{- $caption := .Get "caption" -}}
+
+<figure
+  style="
+    margin: 1em 0;
+    {{ if eq $align "center" }}text-align:center;{{ end }}
+  "
+>
+  <img
+    src="{{ $src | safeURL }}"
+    style="
+      max-width: {{ $width }};
+      height: auto;
+      {{ if eq $align "center" }}display:inline-block;{{ else }}display:block;{{ end }}
+    "
+    alt="{{ $caption | default "" }}"
+  />
+  {{- if $caption }}
+  <figcaption style="font-size:0.9em;color:#666;margin-top:0.5em;">
+    {{ $caption }}
+  </figcaption>
+  {{- end }}
+</figure>
+
