@@ -24,7 +24,7 @@ MCP 采用 C/S（client-server）架构，核心参与者包括：
 | MCP 客户端  | MCP 协议中的客户端角色，负责与 MCP 服务器保持连接，并从 MCP 服务器获取上下文信息，供 MCP 主机使用。 | Claude Desktop 内部的 MCP 实现                        |
 | MCP  服务器 | 实现了 MCP 协议的程序，向 MCP 客户端提供上下文信息。         | 文件系统 MCP、数据库 MCP                              |
 
-![Untitled-2025-12-08-1702](/Users/bytedance/Documents/Untitled-2025-12-08-1702.png)
+![MCP Architecture](mcp-architecture.png)
 
 
 
@@ -115,18 +115,20 @@ VS Code 本身是一个 MCP 主机，通过内置或扩展里的 MCP 客户端�
    }
    ```
 
-   <img src="/Users/bytedance/Library/Application Support/PixPin/Temp/PixPin_2025-12-25_17-00-48.webp" alt="PixPin_2025-12-25_17-00-48" style="zoom:50%;" />
 
+3. 在 MCP SERVERS 下可以看到当前注册成功，并已经成功运行的 MCP 服务器。
 
-3. 现在，我们的 MCP 服务器已经注册完成，GitHub Copilot Chat 就可以使用它了。例如，它可以调用 `list_movies()` 函数，LLM 可以自主决定是否使用它们。
+   {{< img src="cinema_server.webp" width="50%" >}}
 
-​	<img src="/Users/bytedance/Library/Application Support/PixPin/Temp/PixPin_2025-12-25_17-05-49.webp" alt="PixPin_2025-12-25_17-05-49" style="zoom: 33%;" />
+4. 现在，我们的 MCP 服务器已经注册完成，GitHub Copilot Chat 就可以使用它了。例如，它可以调用 `list_movies()` 函数，LLM 可以自主决定是否使用它们。
 
-你还可以根据需要在程序中增加相关功能，以支持更多相关操作，例如查询电影放映场次，模拟购票下单等：
+   {{< img src="cinema_server01.webp" width="50%" >}}
 
-<img src="/Users/bytedance/Library/Application Support/PixPin/Temp/PixPin_2025-12-25_17-38-54.webp" alt="PixPin_2025-12-25_17-38-54" style="zoom: 33%;" />
+5. 你还可以根据需要在程序中增加相关功能，以支持更多相关操作，例如查询电影放映场次，模拟购票下单等：
 
-<img src="/Users/bytedance/Library/Application Support/PixPin/Temp/PixPin_2025-12-25_17-41-13.webp" alt="PixPin_2025-12-25_17-41-13" style="zoom:33%;" />
+   {{< img src="cinema_server02.webp" width="50%" >}}
+
+   {{< img src="cinema_server03.webp" width="50%" >}}
 
 ## MCP 的适用场景
 
@@ -186,7 +188,7 @@ MCP 服务器会为每个工具提供详尽的元数据描述，包括工具名�
 
 这种设计在初期使用时显得简洁高效，甚至带有一种开箱即用的魔法感。然而，在大规模或高可靠性要求的场景中，这种将控制逻辑完全交由模型内部处理的方式，会带来显著挑战：行为可能变得难以预测，调试过程更加复杂，也更难确保系统在不同输入下的确定性和一致性。
 
-### 
+
 
 总之，MCP 简单而强大，它为 LLM 调用真实程序提供了一种标准化接口。一旦某个服务实现了 MCP 协议，任何兼容的 LLM 客户端都能即插即用地将其作为功能扩展——这为构建能够查询 API、执行操作、并与现实系统进行结构化交互的智能体铺平了道路。
 
