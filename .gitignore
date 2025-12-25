@@ -4,3 +4,4 @@ public/
 # Hugo cache (optional)
 resources/
 
+.DS_Store
