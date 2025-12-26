@@ -197,3 +197,8 @@ MCP 服务器会为每个工具提供详尽的元数据描述，包括工具名�
 另外，MCP 的这种设计也不可避免地带来系统开销——包括上下文 token 消耗、响应延迟以及模型推理负担。在对效率、响应速度或资源敏感的场景中，这些因素可能削弱其核心优势：将 AI 智能体从“会说话的聊天机器人”转变为“真正能做事的人工助手”。
 
 当被有意识、负责任且安全地使用时，MCP 为构建可靠、高效、可扩展的智能体提供了一个坚实而清晰的基础。
+
+## References
+
+* https://modelcontextprotocol.io/docs/getting-started/intro
+* https://code.visualstudio.com/docs/copilot/customization/mcp-servers
