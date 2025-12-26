@@ -8,6 +8,8 @@ draft: false
 
 [MCP (Model Context Protocol)](https://modelcontextprotocol.io/docs/getting-started/intro) 是一种由 [Anthropic](https://www.anthropic.com/news/model-context-protocol) 推出并开源的模型上下文协议，它建立了一个标准化的框架，让基于大型语言模型 LLM 的 AI 应用能够无缝地连接到外部数据源、工具和服务（如搜索引擎、数据库、代码库等），从而让 AI 应用能获取最新信息、执行复杂任务、打破信息孤岛，并提供更准确、更具功能性的响应。
 
+![](/Users/bytedance/Documents/02-Project/myblog/content/posts/mcp/what-is-mcp.webp)
+
 **类比说明**：
 
 * 可以将 MCP 看作是 AI 应用的 USB-C 接口。就像 USB-C 为电子设备提供了统一的连接方式一样，MCP 为 AI 应用连接外部系统提供了一种标准化的方法。
@@ -202,3 +204,4 @@ MCP 服务器会为每个工具提供详尽的元数据描述，包括工具名�
 
 * https://modelcontextprotocol.io/docs/getting-started/intro
 * https://code.visualstudio.com/docs/copilot/customization/mcp-servers
+* https://app.diagrams.net/#G1G-3_-34H4hEZ15lVOjeaH0QccOgpHCNc%23%7B%22pageId%22%3A%220vNDXRlS4dqj34YV7MIO%22%7D
