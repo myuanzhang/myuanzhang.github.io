@@ -26,6 +26,8 @@ MCP 采用 C/S（client-server）架构，核心参与者包括：
 | MCP 客户端  | MCP 协议中的客户端角色，负责与 MCP 服务器保持连接，并从 MCP 服务器获取上下文信息，供 MCP 主机使用。 | Claude Desktop 内部的 MCP 实现                        |
 | MCP  服务器 | 实现了 MCP 协议的程序，向 MCP 客户端提供上下文信息。         | 文件系统 MCP、数据库 MCP                              |
 
+当MCP主机与一个MCP服务器建立连接后，MCP主机会初始化一个MCP客户端，用来维持与这个MCP服务器的连接。之后，当MCP主机连接到另外一个MCP服务器时，MCP主机会初始化另外一个MCP客户端来维持与对应MCP服务器的连接：
+
 ![MCP Architecture](mcp-architecture.png)
 
 
