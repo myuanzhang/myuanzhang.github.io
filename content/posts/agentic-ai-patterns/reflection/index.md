@@ -2,7 +2,6 @@
 title: "Reflection: Building Agents That Think Twice and Do Better"
 date: 2025-05-13
 draft: false
-
 ---
 
 **Learn what the Reflection pattern is, how it enables agents to self-correct and improve iteratively, and how to build a reflection-powered agent from scratch using LangGraph.**
