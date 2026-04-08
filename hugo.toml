@@ -9,5 +9,5 @@ theme = "PaperMod"
   ShowToc = true
 
 [author]
-  name = "Hello"  # 你可以修改为你的昵称
-  email = "mrzhangmy1@gmail.com" # 你可以修改为你的邮箱，或者留空字符串 ""
+  name = "Myuanzhang"
+  email = "mrzhangmy1@gmail.com"
