@@ -8,6 +8,6 @@ theme = "PaperMod"
   ShowReadingTime = true
   ShowToc = true
 
-[author]
+[params.author]
   name = "Myuanzhang"
   email = "mrzhangmy1@gmail.com"
