@@ -1,6 +1,6 @@
 ---
 title: "GEO 完全指南：如何让 AI 主动推荐你的产品"
-date: 2026-06-22
+date: 2026-05-12
 draft: false
 tags: ["GEO", "AI", "SEO", "增长"]
 ---
