@@ -2,13 +2,14 @@
 title: "从零构建一个大语言模型（LLM）"
 date: 2025-09-20
 draft: false
+tags: ["LLM", "Transformer", "GPT", "PyTorch", "深度学习"]
 ---
 
 ## 背景与目标
 
 自2022年底，OpenAI发布ChatGPT大语言模型以来，人工智能的浪潮再一次被推向高峰，并且热度持续至今。大语言模型本质上是一种基于深度神经网络的语言处理系统，它在理解、生成和解释人类语言方面展现出了惊人的能力。然而，面对动辄数十亿甚至上千亿的参数，许多初学者往往望而却步，不知从何入手。
 
-本篇文章，我们做一件“彻底”的事情：**从 0 到 1，通过代码逐步实现一个基于Transformer架构的类GPT大语言模型**，通过PyTorch的基础组件，亲手搭建出完整的模型骨架，并深入理解每一个核心组件——从分词、嵌入、多头注意力、层归一化到前馈网络和最终输出层。
+本篇文章，我们做一件"彻底"的事情：**从 0 到 1，通过代码逐步实现一个基于Transformer架构的类GPT大语言模型**，通过PyTorch的基础组件，亲手搭建出完整的模型骨架，并深入理解每一个核心组件——从分词、嵌入、多头注意力、层归一化到前馈网络和最终输出层。最终，我们还会实现训练循环和文本生成函数，并演示如何加载 OpenAI 发布的预训练权重。
 
 我们将实现一个**GPT‑2 small 规格**的大语言模型，其关键配置如下：
 
@@ -49,6 +50,36 @@ model = GPTModel(GPT_CONFIG_124M)
 模型首先通过词元嵌入层和位置嵌入层将文本转换为向量，随后数据进入由12个相同的Transformer模块组成的堆栈。在每个Transformer模块内部，数据依次经过掩码多头注意力机制和前馈神经网络进行处理，并利用残差连接和层归一化来保证训练的稳定与高效。最后，经过所有模块处理的信息会通过一个最终的层归一化和线性输出层，生成模型的预测结果。
 
 ![](gpt-architechture.png)
+
+从数据流角度总结整个前向过程：
+
+```
+Token IDs (batch, seq_len)
+    │
+    ├─ Token Embedding → (batch, seq_len, 768)
+    ├─ Position Embedding → (batch, seq_len, 768)
+    └─ 相加 + Dropout → (batch, seq_len, 768)
+         │
+         ▼
+    ┌─────────────────────────────────┐
+    │   TransformerBlock × 12         │
+    │   ┌───────────────────────┐     │
+    │   │ LayerNorm             │     │
+    │   │ Masked Multi-Head Attn│     │
+    │   │ Dropout + Residual    │     │
+    │   ├───────────────────────┤     │
+    │   │ LayerNorm             │     │
+    │   │ FFN (768→3072→768)    │     │
+    │   │ Dropout + Residual    │     │
+    │   └───────────────────────┘     │
+    └─────────────────────────────────┘
+         │
+         ▼
+    Final LayerNorm → (batch, seq_len, 768)
+         │
+         ▼
+    Linear Head → (batch, seq_len, 50257)  [logits]
+```
 
 ## 核心组件实现
 
@@ -185,16 +216,16 @@ class GPTModel(nn.Module):
 
 ### 掩码多头注意力（Masked Multi‑Head Attention, MHA）
 
-掩码多头注意力是 GPT 类自回归语言模型的**核心组件**。它结合了三个关键概念：**多头注意力**（Multi‑Head Attention）、**因果掩码**（Causal Mask）和**缩放点积注意力**（Scaled Dot‑Product Attention）。理解这一模块，就掌握了 GPT 能够“逐个词生成”的秘密。
+掩码多头注意力是 GPT 类自回归语言模型的**核心组件**。它结合了三个关键概念：**多头注意力**（Multi‑Head Attention）、**因果掩码**（Causal Mask）和**缩放点积注意力**（Scaled Dot‑Product Attention）。理解这一模块，就掌握了 GPT 能够"逐个词生成"的秘密。
 
 #### 为什么需要掩码多头注意力？
 
-在语言模型预训练阶段，模型的任务是“预测下一个词”。训练时我们会给模型一个完整的输入序列（如 `[w1, w2, w3, w4]`），并希望它在预测 `w2` 时只能看到 `w1`，预测 `w3` 时只能看到 `w1, w2`，依此类推。  
+在语言模型预训练阶段，模型的任务是"预测下一个词"。训练时我们会给模型一个完整的输入序列（如 `[w1, w2, w3, w4]`），并希望它在预测 `w2` 时只能看到 `w1`，预测 `w3` 时只能看到 `w1, w2`，依此类推。  
 
-- **不加掩码**：每个位置的注意力会看到所有未来的词，导致信息泄露。模型可以“作弊”，直接复制后面的词，而不是真正学习语言规律。
+- **不加掩码**：每个位置的注意力会看到所有未来的词，导致信息泄露。模型可以"作弊"，直接复制后面的词，而不是真正学习语言规律。
 - **掩码（Mask）**：在计算注意力分数时，把未来位置的注意力值强制设为 `-inf`（经过 softmax 后变为 0），使得当前位置**不能关注到未来的 token**。
 
-> 这种“只关注过去”的注意力模式称为**因果注意力**（Causal Attention），是实现自回归生成的关键。
+> 这种"只关注过去"的注意力模式称为**因果注意力**（Causal Attention），是实现自回归生成的关键。
 
 #### 多头注意力机制
 
@@ -309,7 +340,7 @@ class MultiHeadAttention(nn.Module):
         return context_vec
 ```
 
-### 使用示例
+#### 使用示例
 
 ```python
 # 配置：d_in=768, d_out=768, 12个头, 最大长度1024, dropout=0.1
@@ -322,15 +353,15 @@ out = attn(x)          # 输出形状 (2, 128, 768)
 print(out.shape)       # torch.Size([2, 128, 768])
 ```
 
-### 关键点总结
+#### 关键点总结
 
-- **因果掩码**是自回归模型的核心：每个位置只能看到它自己和之前的 token，保证生成时不会“偷看”未来。
+- **因果掩码**是自回归模型的核心：每个位置只能看到它自己和之前的 token，保证生成时不会"偷看"未来。
 - **多头设计**让模型能够关注不同的语义子空间（例如有的头关注相邻词，有的头关注长距离依赖）。
 - **缩放因子** `1/√d_k` 防止点积过大导致 softmax 梯度饱和。
 - **Dropout** 作用在注意力权重上，是一种有效的正则化手段。
 - 代码中预先生成了最大长度的掩码（`context_length`），并在前向时裁剪到实际长度，避免重复计算。
 
-掌握了掩码多头注意力，你就理解了 GPT 生成文本时“每次只看左边”的机制。下一节我们将介绍层归一化和激活函数，它们与注意力共同构成完整的 Transformer 解码器块。
+掌握了掩码多头注意力，你就理解了 GPT 生成文本时"每次只看左边"的机制。下一节我们将介绍层归一化和激活函数，它们与注意力共同构成完整的 Transformer 解码器块。
 
 ### 层归一化（Layer Normalization）
 
@@ -371,7 +402,7 @@ class LayerNorm(nn.Module):
 - **`keepdim=True`**：保留维度数（形状中的 1），便于后续广播运算。
 - **`unbiased=False`**：使用有偏估计，即分母为 N（`emb_dim`）而不是 N-1。这符合原始 LayerNorm 的定义，且在训练和推理时行为一致。
 - **`result`**：已经归一化为近似标准正态分布。
-- **`self.scale \* result + self.shift`**：引入可学习的缩放和平移，让模型能够自适应地调整输出的分布范围。
+- **`self.scale * result + self.shift`**：引入可学习的缩放和平移，让模型能够自适应地调整输出的分布范围。
 
 ### 激活函数：GELU（Gaussian Error Linear Unit）
 
@@ -412,7 +443,7 @@ class GELU(nn.Module):
 
 - `constant = sqrt(2/π)` 是公式中的系数。
 - `0.044715` 是通过数值拟合得到的系数，使得近似误差最小化。
-- `torch.pow(x, 3)` 计算 x3*x*3。
+- `torch.pow(x, 3)` 计算 x³。
 
 > **注意**：PyTorch 从 1.0 起内置了 `nn.GELU(approximate='tanh')`，可以直接使用，且性能更好。这里手动实现是为了展示底层原理。
 
@@ -431,7 +462,7 @@ class GELU(nn.Module):
 
 #### 标准结构：扩张 → 激活 → 压缩
 
-GPT 采用经典的“两头窄、中间宽”的瓶颈结构：
+GPT 采用经典的"两头窄、中间宽"的瓶颈结构：
 
 ```python
 class FeedForward(nn.Module):
@@ -467,7 +498,7 @@ class FeedForward(nn.Module):
 
 对比多头注意力模块（约 `4*d_model²` 用于 Q、K、V、O 四个矩阵），**FFN 的参数量通常是注意力的 2 倍**。在 GPT‑2 small 中，总参数 1.24 亿，FFN 贡献了约 0.8 亿，是模型容量的主要来源。
 
-### 与其他激活函数的配合
+#### 与其他激活函数的配合
 
 FFN 中默认使用 **GELU** 激活函数（而非 ReLU）。原因是：
 
@@ -499,22 +530,22 @@ class TransformerBlock(nn.Module):
 
 这种设计使得每个 token 的表示先通过注意力收集上下文信息，再通过 FFN 独立精炼，二者交替进行，逐层抽象。
 
-小结：FFN 是 GPT 模型中不可或缺的“位置独立”非线性变换层，通过 **扩张 → GELU → 压缩** 的结构，以 4 倍于 `emb_dim` 的隐藏维度提升模型表达能力。它与注意力层分工协作，共同构成每个 Transformer 块的核心。掌握了 FFN 的实现，你就完成了 Transformer 解码器所有子层的构建。
+小结：FFN 是 GPT 模型中不可或缺的"位置独立"非线性变换层，通过 **扩张 → GELU → 压缩** 的结构，以 4 倍于 `emb_dim` 的隐藏维度提升模型表达能力。它与注意力层分工协作，共同构成每个 Transformer 块的核心。掌握了 FFN 的实现，你就完成了 Transformer 解码器所有子层的构建。
 
 ### 残差连接（Residual Connection）
 
 残差连接（又称快捷连接、跳跃连接）最初由 He et al. 在 2015 年的 ResNet 中提出，用于解决极深网络的训练难题。它后来成为 Transformer（包括 GPT）的核心设计之一，与层归一化共同支撑起上百层的深度模型。
 
-一个残差块可以表示为：`output=F(x)+xoutput=F(x)+ x`，其中：
+一个残差块可以表示为：`output = F(x) + x`，其中：
 
-- x是输入（捷径路径）
-- F(*x*) 是主路径的变换（如多头注意力或前馈网络）
+- x 是输入（捷径路径）
+- F(x) 是主路径的变换（如多头注意力或前馈网络）
 - 输出是两者逐元素相加
 
 #### 为什么残差连接至关重要？
 
-* 缓解梯度消失：在深层网络中，梯度通过链式法则反向传播。如果网络很深（如 GPT‑3 有 96 层），梯度会指数级衰减或爆炸。引入残差连接`y = x + F(x)`后，其梯度为`dy/dx = 1 + F'(x)`，无论 F'(x) 多小，梯度中始终存在一个“1”，这意味着梯度可以直接从后层传到前层，不再完全依赖复杂的非线性路径。残差连接为梯度提供了一条“高速公路”。
-* 改善信息流动：在前向传播中，残差连接允许原始信息绕过非线性层直接传递到后续层，保留了低层特征的细节。对于语言模型而言，早期的 token 信息需要被保留到深层以建立长距离依赖，残差连接为此提供了直接路径。
+* **缓解梯度消失**：在深层网络中，梯度通过链式法则反向传播。如果网络很深（如 GPT‑3 有 96 层），梯度会指数级衰减或爆炸。引入残差连接 `y = x + F(x)` 后，其梯度为 `dy/dx = 1 + F'(x)`，无论 F'(x) 多小，梯度中始终存在一个"1"，这意味着梯度可以直接从后层传到前层，不再完全依赖复杂的非线性路径。残差连接为梯度提供了一条"高速公路"。
+* **改善信息流动**：在前向传播中，残差连接允许原始信息绕过非线性层直接传递到后续层，保留了低层特征的细节。对于语言模型而言，早期的 token 信息需要被保留到深层以建立长距离依赖，残差连接为此提供了直接路径。
 
 #### 在 Transformer 块中的位置
 
@@ -609,9 +640,9 @@ class TransformerBlock(nn.Module):
 
 ## 完整 GPTModel
 
-`GPTModel` 类将所有之前构建的组件整合到一起，形成一个完整的生成式预训练 Transformer 模型。它包含了从 token 输入到 logits 输出的完整前向计算图，是“从零构建大语言模型”的最终成果。
+`GPTModel` 类将所有之前构建的组件整合到一起，形成一个完整的生成式预训练 Transformer 模型。它包含了从 token 输入到 logits 输出的完整前向计算图，是"从零构建大语言模型"的最终成果。
 
-#### 代码实现
+### 代码实现
 
 ```python
 class GPTModel(nn.Module):
@@ -635,7 +666,7 @@ class GPTModel(nn.Module):
         self.final_layernorm = LayerNorm(cfg)
         
         # 输出头（语言建模头）,将每个位置的 emb_dim 维表示映射到词汇表大小的 logits（未归一化的分数）。
-        self.out_head = nn.Linear(cfg["emb_dim"], cfg["vocab_size"], bias=cfg["qkv_bias"])
+        self.out_head = nn.Linear(cfg["emb_dim"], cfg["vocab_size"], bias=False)
         
     # 前向传播
     def forward(self, x):
@@ -651,7 +682,26 @@ class GPTModel(nn.Module):
         return logits
 ```
 
-#### 关键组件总结
+### 权重绑定（Weight Tying）
+
+GPT-2 使用了一个重要的优化技巧：**将词嵌入层（`tok_embed`）和输出头（`out_head`）的权重共享**。
+
+直觉上这是合理的——词嵌入将 token ID 映射到语义向量空间，输出头将语义向量映射回 token ID 的概率分布，两者做的是"对称"的事情。共享权重不仅减少了约 3800 万参数（`50257 × 768`），还在实践中改善了模型性能。
+
+```python
+class GPTModel(nn.Module):
+    def __init__(self, cfg):
+        super().__init__()
+        # ... 其他层定义同上 ...
+        self.out_head = nn.Linear(cfg["emb_dim"], cfg["vocab_size"], bias=False)
+        
+        # 权重绑定：输出头与词嵌入共享权重
+        self.out_head.weight = self.tok_embed.weight
+```
+
+绑定后，`tok_embed.weight` 和 `out_head.weight` 指向同一个张量，梯度会同时更新这个共享参数。
+
+### 关键组件总结
 
 | 组件              | 作用                                    | 是否可训练 |
 | :---------------- | :-------------------------------------- | :--------- |
@@ -660,7 +710,32 @@ class GPTModel(nn.Module):
 | `dropout_emb`     | 正则化，防止过拟合                      | 否         |
 | `trf_blocks`      | 堆叠的 Transformer 解码器，提取深层特征 | 是         |
 | `final_layernorm` | 稳定输出分布，提升训练稳定性            | 是         |
-| `out_head`        | 将隐藏表示映射到词汇表空间              | 是         |
+| `out_head`        | 将隐藏表示映射到词汇表空间（与 tok_embed 共享权重） | 是         |
+
+### 参数量验证
+
+让我们验证模型确实有约 1.24 亿参数：
+
+```python
+model = GPTModel(GPT_CONFIG_124M)
+total_params = sum(p.numel() for p in model.parameters())
+print(f"Total parameters: {total_params:,}")
+# 输出: Total parameters: 124,439,808（约 1.24 亿）
+```
+
+各部分参数量拆解：
+
+| 组件 | 计算 | 参数量 |
+|:-----|:-----|:-------|
+| tok_embed | 50257 × 768 | 38,597,376 |
+| pos_embed | 1024 × 768 | 786,432 |
+| 每层 MHA (Q,K,V,O) | 4 × 768 × 768 | 2,359,296 |
+| 每层 FFN | 768×3072 + 3072×768 | 4,718,592 |
+| 每层 LayerNorm ×2 | 2 × 768 × 2 | 3,072 |
+| 12 层 Transformer 合计 | 12 × (2,359,296 + 4,718,592 + 3,072) | 84,969,504 |
+| final_layernorm | 768 × 2 | 1,536 |
+| out_head（与 tok_embed 绑定） | 0（共享） | 0 |
+| **总计** | | **~124M** |
 
 ### 使用示例
 
@@ -686,6 +761,455 @@ logits = model(input_ids)
 print(logits.shape)   # torch.Size([2, 128, 50257])
 ```
 
+## 训练循环
+
+模型搭建完成后，接下来实现训练循环。GPT 的预训练目标非常简洁：**给定前面的所有 token，预测下一个 token**。这是一个标准的自回归语言建模任务，使用交叉熵损失。
+
+### 数据准备
+
+训练数据的准备方式是：从语料中截取固定长度的文本块，输入是前 N 个 token，目标是后 N 个 token（即输入右移一位）。
+
+```python
+import torch
+from torch.utils.data import Dataset, DataLoader
+
+class TextDataset(Dataset):
+    def __init__(self, token_ids, context_length):
+        """
+        token_ids: 整个语料编码后的 1D tensor
+        context_length: 每个训练样本的序列长度
+        """
+        self.input_ids = []
+        self.target_ids = []
+        
+        for i in range(0, len(token_ids) - context_length, context_length):
+            input_chunk = token_ids[i : i + context_length]
+            target_chunk = token_ids[i + 1 : i + context_length + 1]
+            self.input_ids.append(input_chunk)
+            self.target_ids.append(target_chunk)
+    
+    def __len__(self):
+        return len(self.input_ids)
+    
+    def __getitem__(self, idx):
+        return self.input_ids[idx], self.target_ids[idx]
+```
+
+使用示例：
+
+```python
+import tiktoken
+
+tokenizer = tiktoken.get_encoding("gpt2")
+
+# 假设有一段训练文本
+with open("train.txt", "r") as f:
+    text = f.read()
+
+token_ids = torch.tensor(tokenizer.encode(text), dtype=torch.long)
+dataset = TextDataset(token_ids, context_length=1024)
+dataloader = DataLoader(dataset, batch_size=4, shuffle=True)
+```
+
+### 训练步骤
+
+```python
+import torch.optim as optim
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model = GPTModel(GPT_CONFIG_124M).to(device)
+optimizer = optim.AdamW(model.parameters(), lr=3e-4, weight_decay=0.1)
+
+def train_epoch(model, dataloader, optimizer, device):
+    model.train()
+    total_loss = 0
+    
+    for batch_idx, (input_ids, target_ids) in enumerate(dataloader):
+        input_ids = input_ids.to(device)
+        target_ids = target_ids.to(device)
+        
+        # 前向传播
+        logits = model(input_ids)  # (batch, seq_len, vocab_size)
+        
+        # 计算交叉熵损失
+        # 需要将 logits 和 targets 展平
+        loss = torch.nn.functional.cross_entropy(
+            logits.view(-1, logits.size(-1)),  # (batch*seq_len, vocab_size)
+            target_ids.view(-1)                # (batch*seq_len,)
+        )
+        
+        # 反向传播
+        optimizer.zero_grad()
+        loss.backward()
+        
+        # 梯度裁剪（防止梯度爆炸）
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+        
+        # 更新参数
+        optimizer.step()
+        
+        total_loss += loss.item()
+        
+        if batch_idx % 100 == 0:
+            print(f"  Batch {batch_idx}, Loss: {loss.item():.4f}")
+    
+    return total_loss / len(dataloader)
+
+# 训练循环
+num_epochs = 10
+for epoch in range(num_epochs):
+    avg_loss = train_epoch(model, dataloader, optimizer, device)
+    print(f"Epoch {epoch+1}/{num_epochs}, Average Loss: {avg_loss:.4f}")
+```
+
+### 关键训练细节
+
+| 超参数 | GPT-2 常用值 | 说明 |
+|:-------|:-------------|:-----|
+| 优化器 | AdamW | 带权重衰减的 Adam，是 Transformer 的标配 |
+| 学习率 | 3e-4 ~ 6e-4 | 配合 warmup + cosine decay 调度器 |
+| 权重衰减 | 0.1 | 仅对非 bias/LayerNorm 参数生效 |
+| 梯度裁剪 | max_norm=1.0 | 防止训练初期梯度爆炸 |
+| Batch Size | 越大越好 | GPT-2 原始论文用了 512 × 1024 tokens/batch |
+
+### 学习率调度
+
+实际训练中通常使用 warmup + cosine decay 策略：
+
+```python
+from torch.optim.lr_scheduler import CosineAnnealingLR
+
+# 线性 warmup + 余弦衰减
+warmup_steps = 1000
+max_steps = 50000
+
+def get_lr(step):
+    if step < warmup_steps:
+        return step / warmup_steps  # 线性增长
+    # 余弦衰减到最小学习率
+    progress = (step - warmup_steps) / (max_steps - warmup_steps)
+    return 0.5 * (1 + torch.cos(torch.tensor(progress * torch.pi)))
+
+# 或使用 PyTorch 内置调度器
+scheduler = CosineAnnealingLR(optimizer, T_max=max_steps, eta_min=1e-5)
+```
+
+## 文本生成
+
+训练完成（或加载预训练权重）后，我们可以用模型生成文本。自回归生成的核心循环是：输入已有 token → 模型预测下一个 token 的概率分布 → 采样一个 token → 追加到输入 → 重复。
+
+### 贪心解码（Greedy Decoding）
+
+最简单的策略：每次选概率最高的 token。
+
+```python
+def generate_greedy(model, input_ids, max_new_tokens, context_length):
+    """
+    model: 训练好的 GPTModel
+    input_ids: 初始 token IDs, shape (1, seq_len)
+    max_new_tokens: 要生成的最大 token 数
+    context_length: 模型支持的最大上下文长度
+    """
+    model.eval()
+    with torch.no_grad():
+        for _ in range(max_new_tokens):
+            # 截断到最大上下文长度
+            idx_cond = input_ids[:, -context_length:]
+            
+            # 前向传播
+            logits = model(idx_cond)  # (1, seq_len, vocab_size)
+            
+            # 只取最后一个位置的 logits
+            logits_last = logits[:, -1, :]  # (1, vocab_size)
+            
+            # 贪心：取 argmax
+            next_token = logits_last.argmax(dim=-1, keepdim=True)  # (1, 1)
+            
+            # 追加到序列
+            input_ids = torch.cat([input_ids, next_token], dim=1)
+    
+    return input_ids
+```
+
+### Temperature 采样
+
+贪心解码总是选最高概率的 token，生成的文本确定性强但缺乏多样性。通过引入 **temperature** 参数，可以控制采样的随机性：
+
+- `temperature < 1`：分布更尖锐，倾向于高概率 token（更保守）
+- `temperature = 1`：原始分布
+- `temperature > 1`：分布更平坦，增加随机性（更有创意）
+
+```python
+def generate_with_temperature(model, input_ids, max_new_tokens, context_length, temperature=1.0):
+    model.eval()
+    with torch.no_grad():
+        for _ in range(max_new_tokens):
+            idx_cond = input_ids[:, -context_length:]
+            logits = model(idx_cond)
+            logits_last = logits[:, -1, :]
+            
+            # 应用 temperature
+            logits_last = logits_last / temperature
+            
+            # 转为概率分布并采样
+            probs = torch.softmax(logits_last, dim=-1)
+            next_token = torch.multinomial(probs, num_samples=1)
+            
+            input_ids = torch.cat([input_ids, next_token], dim=1)
+    
+    return input_ids
+```
+
+### Top-k 和 Top-p 采样
+
+为了在多样性和质量之间取得平衡，实际应用中常用 **Top-k** 和 **Top-p（nucleus sampling）**：
+
+```python
+def generate(model, input_ids, max_new_tokens, context_length,
+             temperature=1.0, top_k=None, top_p=None):
+    """
+    完整的文本生成函数，支持 temperature、top-k、top-p。
+    """
+    model.eval()
+    with torch.no_grad():
+        for _ in range(max_new_tokens):
+            idx_cond = input_ids[:, -context_length:]
+            logits = model(idx_cond)
+            logits_last = logits[:, -1, :]  # (batch, vocab_size)
+            
+            # 1. 应用 temperature
+            if temperature != 1.0:
+                logits_last = logits_last / temperature
+            
+            # 2. Top-k 过滤：只保留概率最高的 k 个 token
+            if top_k is not None:
+                top_k_values, _ = torch.topk(logits_last, top_k, dim=-1)
+                min_top_k = top_k_values[:, -1].unsqueeze(-1)
+                logits_last = torch.where(
+                    logits_last < min_top_k,
+                    torch.full_like(logits_last, float('-inf')),
+                    logits_last
+                )
+            
+            # 3. Top-p (nucleus) 过滤：保留累积概率 ≤ p 的最小 token 集合
+            if top_p is not None:
+                sorted_logits, sorted_indices = torch.sort(logits_last, descending=True)
+                cumulative_probs = torch.cumsum(torch.softmax(sorted_logits, dim=-1), dim=-1)
+                
+                # 找到累积概率超过 top_p 的位置
+                sorted_mask = cumulative_probs - torch.softmax(sorted_logits, dim=-1) > top_p
+                sorted_logits[sorted_mask] = float('-inf')
+                
+                # 恢复原始顺序
+                logits_last = sorted_logits.scatter(1, sorted_indices.argsort(1), sorted_logits)
+            
+            # 4. 采样
+            probs = torch.softmax(logits_last, dim=-1)
+            next_token = torch.multinomial(probs, num_samples=1)
+            
+            input_ids = torch.cat([input_ids, next_token], dim=1)
+    
+    return input_ids
+```
+
+### 生成示例
+
+```python
+import tiktoken
+
+tokenizer = tiktoken.get_encoding("gpt2")
+model.eval()
+
+# 编码输入提示
+prompt = "The future of artificial intelligence"
+input_ids = torch.tensor([tokenizer.encode(prompt)], device=device)
+
+# 生成（使用 top-k=50, temperature=0.8）
+output_ids = generate(
+    model, input_ids, 
+    max_new_tokens=200,
+    context_length=1024,
+    temperature=0.8,
+    top_k=50
+)
+
+# 解码并打印
+generated_text = tokenizer.decode(output_ids[0].tolist())
+print(generated_text)
+```
+
+不同采样策略的效果对比：
+
+| 策略 | 特点 | 适用场景 |
+|:-----|:-----|:---------|
+| Greedy (temperature=0) | 确定性，最高概率 | 事实性问答、代码生成 |
+| temperature=0.7 + top_k=50 | 平衡质量与多样性 | 通用文本生成 |
+| temperature=1.0 + top_p=0.9 | 较高随机性 | 创意写作、故事生成 |
+| temperature=1.2 + top_p=0.95 | 高随机性 | 头脑风暴、多样化生成 |
+
+## 加载预训练权重
+
+从零训练一个 GPT-2 需要大量算力（原始论文用了 256 块 V100 训练数周）。在实践中，我们通常加载 OpenAI 发布的预训练权重，然后在此基础上进行微调或直接推理。
+
+### 从 HuggingFace 加载 GPT-2 权重
+
+```python
+from transformers import GPT2LMHeadModel
+
+def load_gpt2_weights(our_model, model_name="gpt2"):
+    """
+    将 HuggingFace GPT-2 的预训练权重加载到我们自己实现的 GPTModel 中。
+    model_name: "gpt2" (small), "gpt2-medium", "gpt2-large", "gpt2-xl"
+    """
+    # 下载 HuggingFace 的 GPT-2 模型
+    hf_model = GPT2LMHeadModel.from_pretrained(model_name)
+    hf_state = hf_model.state_dict()
+    
+    # 映射权重
+    with torch.no_grad():
+        # 词嵌入和位置嵌入
+        our_model.tok_embed.weight.copy_(hf_state["transformer.wte.weight"])
+        our_model.pos_embed.weight.copy_(hf_state["transformer.wpe.weight"])
+        
+        # 逐层映射 Transformer 块
+        for i in range(our_model.trf_blocks.__len__()):
+            prefix = f"transformer.h.{i}"
+            block = our_model.trf_blocks[i]
+            
+            # 注意力层的 Q, K, V（HuggingFace 将三者合并为一个矩阵）
+            qkv_weight = hf_state[f"{prefix}.attn.c_attn.weight"]
+            qkv_bias = hf_state.get(f"{prefix}.attn.c_attn.bias")
+            
+            d = qkv_weight.shape[0]
+            q_w, k_w, v_w = qkv_weight.split(d, dim=1)
+            block.attn.W_query.weight.copy_(q_w.T)
+            block.attn.W_key.weight.copy_(k_w.T)
+            block.attn.W_value.weight.copy_(v_w.T)
+            
+            if qkv_bias is not None:
+                q_b, k_b, v_b = qkv_bias.split(d)
+                block.attn.W_query.bias.copy_(q_b)
+                block.attn.W_key.bias.copy_(k_b)
+                block.attn.W_value.bias.copy_(v_b)
+            
+            # 注意力输出投影
+            block.attn.out_proj.weight.copy_(
+                hf_state[f"{prefix}.attn.c_proj.weight"].T
+            )
+            block.attn.out_proj.bias.copy_(
+                hf_state[f"{prefix}.attn.c_proj.bias"]
+            )
+            
+            # FFN
+            block.ff.layers[0].weight.copy_(
+                hf_state[f"{prefix}.mlp.c_fc.weight"].T
+            )
+            block.ff.layers[0].bias.copy_(
+                hf_state[f"{prefix}.mlp.c_fc.bias"]
+            )
+            block.ff.layers[2].weight.copy_(
+                hf_state[f"{prefix}.mlp.c_proj.weight"].T
+            )
+            block.ff.layers[2].bias.copy_(
+                hf_state[f"{prefix}.mlp.c_proj.bias"]
+            )
+            
+            # Layer Norms
+            block.layernorm1.scale.copy_(hf_state[f"{prefix}.ln_1.weight"])
+            block.layernorm1.shift.copy_(hf_state[f"{prefix}.ln_1.bias"])
+            block.layernorm2.scale.copy_(hf_state[f"{prefix}.ln_2.weight"])
+            block.layernorm2.shift.copy_(hf_state[f"{prefix}.ln_2.bias"])
+        
+        # 最终 LayerNorm
+        our_model.final_layernorm.scale.copy_(hf_state["transformer.ln_f.weight"])
+        our_model.final_layernorm.shift.copy_(hf_state["transformer.ln_f.bias"])
+        
+        # 输出头（与 tok_embed 共享权重，已自动绑定）
+    
+    print(f"Successfully loaded weights from '{model_name}'")
+    return our_model
+```
+
+### 加载并测试
+
+```python
+# 创建模型（注意 GPT-2 原始配置使用 qkv_bias=True）
+cfg_gpt2 = {
+    "vocab_size": 50257,
+    "context_length": 1024,
+    "emb_dim": 768,
+    "num_heads": 12,
+    "num_layers": 12,
+    "dropout": 0.0,
+    "qkv_bias": True  # GPT-2 原始模型使用偏置
+}
+
+model = GPTModel(cfg_gpt2)
+model = load_gpt2_weights(model, "gpt2")
+model = model.to(device)
+
+# 测试生成
+prompt = "In a world where AI has become"
+input_ids = torch.tensor([tokenizer.encode(prompt)], device=device)
+
+output_ids = generate(
+    model, input_ids,
+    max_new_tokens=100,
+    context_length=1024,
+    temperature=0.7,
+    top_k=40
+)
+
+print(tokenizer.decode(output_ids[0].tolist()))
+```
+
+### GPT-2 模型家族
+
+| 模型 | 层数 | 头数 | emb_dim | 参数量 |
+|:-----|:-----|:-----|:--------|:-------|
+| gpt2 (small) | 12 | 12 | 768 | 124M |
+| gpt2-medium | 24 | 16 | 1024 | 355M |
+| gpt2-large | 36 | 20 | 1280 | 774M |
+| gpt2-xl | 48 | 25 | 1600 | 1558M |
+
+## Pre-Norm vs Post-Norm
+
+值得注意的是，我们的实现（以及 GPT-2）使用的是 **Pre-Norm**（归一化在子层之前），而原始 Transformer 论文使用的是 **Post-Norm**（归一化在子层之后）。
+
+```python
+# Pre-Norm（GPT-2 采用）：更稳定，不需要精心调整学习率 warmup
+x = x + Attention(LayerNorm(x))
+x = x + FFN(LayerNorm(x))
+
+# Post-Norm（原始 Transformer）：需要更仔细的初始化和 warmup
+x = LayerNorm(x + Attention(x))
+x = LayerNorm(x + FFN(x))
+```
+
+Pre-Norm 的优势在于：梯度在残差路径上不经过归一化层，信号衰减更少，训练更稳定，已成为现代 LLM 的主流选择。
+
 ## 总结
 
-`GPTModel` 将词嵌入、位置嵌入、Dropout、多个 `TransformerBlock`、最终层归一化和输出线性层串联成一个端到端的自回归语言模型。它完整实现了 GPT 系列模型的骨干架构，是“从零构建大语言模型”的最终成品。理解了这个类的实现，你就掌握了现代 LLM 最基本的代码形态——从输入文本到输出 logits 的完整路径。接下来，你可以在此基础上添加训练循环、生成函数，甚至加载预训练权重进行微调。
+本文从零开始，逐步实现了一个完整的 GPT-2 级别的大语言模型。让我们回顾完整的构建路径：
+
+1. **分词器**：使用 BPE 将文本转为 token ID 序列
+2. **嵌入层**：词嵌入 + 位置嵌入，将离散 ID 转为连续向量
+3. **掩码多头注意力**：实现因果性，让模型"只看左边"
+4. **前馈网络**：逐位置的非线性变换，扩张-激活-压缩
+5. **层归一化 + 残差连接**：稳定深层训练
+6. **TransformerBlock**：将上述组件组装为可重复堆叠的单元
+7. **GPTModel**：端到端的完整模型，包含权重绑定
+8. **训练循环**：交叉熵损失 + AdamW + 梯度裁剪
+9. **文本生成**：贪心、temperature、top-k、top-p 多种策略
+10. **加载预训练权重**：对接 HuggingFace，即刻可用
+
+理解了这套代码，你就掌握了现代大语言模型最核心的代码形态。在此基础上，你可以进一步探索：
+
+- **监督微调（SFT）**：在指令-回答数据集上微调，让模型遵从指令
+- **RLHF / DPO**：通过人类偏好对齐模型输出
+- **KV Cache**：加速推理时的自回归生成
+- **量化（Quantization）**：INT8/INT4 量化，降低显存占用
+- **Flash Attention**：内存高效的注意力实现
+- **分布式训练**：数据并行、张量并行、流水线并行
+
+从 124M 到 1750 亿参数，底层架构的核心逻辑是相同的——只是规模不同。掌握了小模型的完整实现，就等于拥有了理解所有 GPT 类模型的钥匙。
