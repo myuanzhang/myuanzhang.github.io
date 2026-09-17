@@ -1,5 +1,5 @@
 ---
-title: "V4.1 Flash 如何降低 Agent 成本"
+title: "DeepSeek V4.1 Flash 如何降低 Agent 成本"
 date: 2026-09-17
 draft: false
 tags: ["DeepSeek", "KV Cache", "Agent", "LLM", "推理成本"]
