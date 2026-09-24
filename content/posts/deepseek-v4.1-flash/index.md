@@ -9,7 +9,7 @@ tags: ["DeepSeek", "KV Cache", "Agent", "LLM", "推理成本"]
 
 DeepSeek 把语言主干分成了 20 层因果编码器和 20 层解码器，让大部分输入 token 只需经过前半段网络。同时，它还重新安排了各层保存和读取上下文的方式，大幅缩小了缓存。
 
-Sebastian Raschka 对这次更新的评价很直接：
+[Sebastian Raschka](https://x.com/rasbt/status/2098142625819672603) 对这次更新的评价很直接：
 
 > Big overhaul on DeepSeek V4.1 using an encoder-decoder setup. Tbh they should have called it DeepSeek V5! Super cool and refreshing, though!
 
@@ -45,9 +45,9 @@ DeepSWE v1.1 从 54.4% 提高到 74.2%，Automation-Bench 从 37.7% 提高到 54
 
 模型通常分两个阶段处理这类请求。
 
-**预填充（prefill）**处理已经给出的输入。输入 token 都已知，同一层内可以并行计算多个位置，但仍需按照网络的层次逐层执行。在这个过程中，模型还会建立后续生成需要的 KV 缓存。
+预填充（prefill）处理已经给出的输入。输入 token 都已知，同一层内可以并行计算多个位置，但仍需按照网络的层次逐层执行。在这个过程中，模型还会建立后续生成需要的 KV 缓存。
 
-**解码（decode）**逐个生成后续 token。每一步都依赖前面已经生成的内容，直到回答完成。
+解码（decode）逐个生成后续 token。每一步都依赖前面已经生成的内容，直到回答完成。
 
 ![预填充并行处理已知输入并保存 KV，解码逐个生成 token，复用并扩展历史 KV。](prefill-and-decode.png)
 
