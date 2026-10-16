@@ -5,6 +5,8 @@ draft: false
 tags: ["LLM", "GPT-6", "Transformer", "推理模型", "AI"]
 ---
 
+> 本文编译自 Sebastian Raschka 发表在 Ahead of AI 的 [GPT-6 Astra, Looped Transformers, and Hidden Reasoning](https://magazine.sebastianraschka.com/p/gpt-6-astra-looped-transformers-and)（2026 年 9 月 9 日），文中的第一人称均指原作者。
+
 过去几周 AI 圈发生了不少事，眼下大家最关注的想必就是 OpenAI 刚推出的 GPT-6 Astra。围绕这款模型，讨论主要集中在以下几个方面：
  - GPT-6 Astra 的实际性能表现
  - 所谓的循环 Transformer（Looped Transformer）架构
@@ -18,7 +20,7 @@ tags: ["LLM", "GPT-6", "Transformer", "推理模型", "AI"]
 
 自上周 OpenAI 发布 GPT-6 Astra 以来，深度使用了几天，表现确实很出色，大概是我到目前为止用过的最强的模型，从社区的反馈来看也是如此。
 
-![](/Users/bytedance/Documents/02_Areas/myblog/content/posts/gpt6-astra-looped-transformers/fig22.png)
+![](fig22.png)
 
 那这次的GPT-6 Astra，究竟在哪些方面实现了进一步加强，又是如何做到的呢？我们来一探究竟。
 
@@ -50,7 +52,7 @@ tags: ["LLM", "GPT-6", "Transformer", "推理模型", "AI"]
 
 例如，还有人[用 GPT-6 Astra 创建了一个高度精细的 V8 发动机交互式可视化图像](https://x.com/DilumSanjaya/status/2096280244663775423)。
 
-![](/Users/bytedance/Documents/02_Areas/myblog/content/posts/gpt6-astra-looped-transformers/fig23.png)
+![](fig23.png)
 
 作者提到，从他自己进行的小规模测试来看，GPT-6 Astra 在这类任务中的表现确实超过了 Claude Opus 5 和 Fable。（不过需要注意，这属于个人测试结果，测试规模和方法并不等同于严格的第三方 Benchmark，因此更适合作为社区体验案例来看待，而不是正式的模型排名。）
 
@@ -132,7 +134,7 @@ GPT-6 Astra 并不是第一个在 Harness 配合下，能完成通用计算机�
 
 ## 循环式 Transformer（Looped Transformer）
 
-Astra 正式发布前两天，The Information 刊登了一篇[报道](https://www.theinformation.com/articles/secret-technique-behind-openais-astra-model-sparks-security-concerns)，援引内部消息称 Astra 采用了一种名为"循环深度"（recurrent depth）或"循环式 Transformer"（looped transformer）的技术方案。
+Astra 正式发布前两天，The Information 刊登了一篇[报道](https://www.theinformation.com/articles/secret-technique-behind-openais-astra-model-sparks-security-concerns)，援引内部消息称 Astra 采用了一种名为“循环深度”（recurrent depth）或“循环式 Transformer”（looped transformer）的技术方案。
 
 ![](fig04.png)
 
@@ -140,7 +142,7 @@ Astra 正式发布前两天，The Information 刊登了一篇[报道](https://ww
 
 ### 2.1 复用 Transformer 模块
 
-循环式 Transformer 本质上是对模型架构的一种调整，核心思想是：让 token 的中间特征表示多次通过同一组 Transformer 模块，而不是只通过一次。和直接堆叠更多模块相比，关键的"诀窍"是这些模块共用同一套权重。
+循环式 Transformer 本质上是对模型架构的一种调整，核心思想是：让 token 的中间特征表示多次通过同一组 Transformer 模块，而不是只通过一次。和直接堆叠更多模块相比，关键的“诀窍”是这些模块共用同一套权重。
 
 先约定几个术语：
 

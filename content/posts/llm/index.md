@@ -5,6 +5,8 @@ draft: false
 tags: ["LLM", "Transformer", "GPT", "PyTorch", "深度学习"]
 ---
 
+> 本文的代码结构和讲解顺序参照 Sebastian Raschka 的《Build a Large Language Model (From Scratch)》（Manning 出版）及配套仓库 [rasbt/LLMs-from-scratch](https://github.com/rasbt/LLMs-from-scratch)。
+
 ## 这篇文章想带你做什么
 
 ChatGPT 出来之后，大家都知道大语言模型很强，但打开论文看到“1750 亿参数”“96 层 Transformer”这些数字，很容易就不想看了。
